@@ -1,0 +1,196 @@
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+enum Role {
+  STUDENT
+  ADMIN
+}
+
+model User {
+  id            String    @id @default(uuid())
+  email         String    @unique
+  password      String
+  role          Role      @default(STUDENT)
+  name          String?
+  collegeName   String?
+  course        String?
+  branch        String?
+  year          String?
+  semester      String?
+  streak        Int       @default(0)
+  lastStudyDate DateTime?
+  studyHours    Float     @default(0.0)
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  syllabi       Syllabus[]
+  tasks         StudyPlanTask[]
+  pyqAnalyses   PYQAnalysis[]
+  revisions     RevisionMaterial[]
+  mockTests     MockTest[]
+  attempts      MockTestAttempt[]
+  flashcards    Flashcard[]
+  goals         Goal[]
+  notifications SystemNotification[]
+  feedbacks     SystemFeedback[]
+}
+
+model Syllabus {
+  id          String    @id @default(uuid())
+  userId      String
+  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  fileName    String
+  fileUrl     String?
+  createdAt   DateTime  @default(now())
+  subjects    Subject[]
+}
+
+model Subject {
+  id             String    @id @default(uuid())
+  syllabusId     String
+  syllabus       Syllabus  @relation(fields: [syllabusId], references: [id], onDelete: Cascade)
+  name           String
+  code           String?
+  difficulty     String    // e.g. "Hard", "Medium", "Easy"
+  estimatedHours Float     @default(0.0)
+  progress       Float     @default(0.0) // 0-100 percentage
+  units          Unit[]
+}
+
+model Unit {
+  id         String    @id @default(uuid())
+  subjectId  String
+  subject    Subject   @relation(fields: [subjectId], references: [id], onDelete: Cascade)
+  name       String
+  order      Int
+  topics     Topic[]
+}
+
+model Topic {
+  id               String   @id @default(uuid())
+  unitId           String
+  unit             Unit     @relation(fields: [unitId], references: [id], onDelete: Cascade)
+  name             String
+  difficulty       String
+  estimatedMinutes Int      @default(45)
+  completed        Boolean  @default(false)
+  
+  // JSON stores for AI resources
+  explanationBeginner String?  @db.Text
+  explanationDetailed String?  @db.Text
+  examples            String?  @db.Text
+  practiceQuestions   String?  @db.Text // JSON string of questions
+  quiz                String?  @db.Text // JSON string of quiz questions
+}
+
+model StudyPlanTask {
+  id          String   @id @default(uuid())
+  userId      String
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  timeSlot    String   // e.g. "9:00 AM"
+  subjectName String
+  topicName   String
+  completed   Boolean  @default(false)
+  date        String   // e.g. "2026-05-31"
+  createdAt   DateTime @default(now())
+}
+
+model PYQAnalysis {
+  id                String   @id @default(uuid())
+  userId            String
+  user              User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  subjectName       String
+  fileName          String
+  repeatedQuestions String?  @db.Text // JSON text
+  weightageAnalysis String?  @db.Text // JSON text
+  unitTrends        String?  @db.Text // JSON text
+  examPatterns      String?  @db.Text // JSON text
+  createdAt         DateTime @default(now())
+}
+
+model RevisionMaterial {
+  id          String   @id @default(uuid())
+  userId      String
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  subjectName String
+  topicName   String
+  type        String   // e.g. "QUICK", "FULL", "FORMULA", "LAST_MINUTE", "ONE_DAY"
+  content     String   @db.Text
+  createdAt   DateTime @default(now())
+}
+
+model MockTest {
+  id              String            @id @default(uuid())
+  userId          String
+  user            User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+  subjectName     String
+  type            String            // "MCQ" or "SUBJECTIVE"
+  durationMinutes Int               @default(60)
+  questions       String            @db.Text // JSON array of questions
+  createdAt       DateTime          @default(now())
+  attempts        MockTestAttempt[]
+}
+
+model MockTestAttempt {
+  id                String   @id @default(uuid())
+  mockTestId        String
+  mockTest          MockTest @relation(fields: [mockTestId], references: [id], onDelete: Cascade)
+  userId            String
+  user              User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  answers           String   @db.Text // JSON array of answers
+  score             Int      @default(0)
+  evaluationReport  String   @db.Text // JSON report from AI tutor
+  completedAt       DateTime @default(now())
+}
+
+model Flashcard {
+  id             String    @id @default(uuid())
+  userId         String
+  user           User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  subjectName    String
+  topicName      String
+  question       String    @db.Text
+  answer         String    @db.Text
+  difficulty     String    @default("Medium") // "Easy", "Medium", "Hard"
+  nextReviewDate DateTime  @default(now())
+  intervalDays   Int       @default(1)
+  easeFactor     Float     @default(2.5)
+  createdAt      DateTime  @default(now())
+}
+
+model Goal {
+  id          String   @id @default(uuid())
+  userId      String
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  description String
+  completed   Boolean  @default(false)
+  targetDate  String   // e.g. "2026-06-05"
+  createdAt   DateTime @default(now())
+}
+
+model SystemNotification {
+  id        String   @id @default(uuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  title     String
+  message   String
+  type      String   // e.g. "REVISION", "EXAM", "MOTIVATION", "STREAK"
+  read      Boolean  @default(false)
+  createdAt DateTime @default(now())
+}
+
+model SystemFeedback {
+  id           String   @id @default(uuid())
+  userId       String
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  name         String
+  feedbackText String   @db.Text
+  rating       Int      @default(5)
+  createdAt    DateTime @default(now())
+}
